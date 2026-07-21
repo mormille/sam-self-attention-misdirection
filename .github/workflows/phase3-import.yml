@@ -35,16 +35,9 @@ jobs:
           git filter-repo \
             --refs phase3-source \
             --path 'SAM - Adversarial Self-Attention Misdirection/' \
-            --path-rename 'SAM - Adversarial Self-Attention Misdirection/':' ' \
+            --path-rename 'SAM - Adversarial Self-Attention Misdirection/:' \
             --force
           git checkout phase3-source
-          python - <<'PY'
-          from pathlib import Path
-          for p in Path('.').iterdir():
-              if p.name.startswith(' '):
-                  target = Path(p.name.lstrip())
-                  p.rename(target)
-          PY
 
       - name: Attach filtered history to target baseline
         working-directory: source
