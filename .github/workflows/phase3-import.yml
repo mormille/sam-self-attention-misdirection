@@ -1,0 +1,100 @@
+name: Phase 3 historical import
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/phase3-import.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import-history:
+    runs-on: ubuntu-latest
+    env:
+      SOURCE_REPOSITORY: mormille/self-attention-regularization
+      SOURCE_COMMIT: 9f294c2a19fb855dd6230d6fcb38607e36fcac7e
+      IMPORT_BRANCH: migration/phase-3-historical-import
+      ARCHIVE_TAG: v0.1.0-research-archive
+      GIT_LFS_SKIP_SMUDGE: "1"
+    steps:
+      - name: Clone frozen source history
+        run: |
+          git clone --no-tags "https://github.com/${SOURCE_REPOSITORY}.git" source
+          cd source
+          git branch phase3-source "${SOURCE_COMMIT}"
+
+      - name: Install git-filter-repo
+        run: python -m pip install --disable-pip-version-check git-filter-repo
+
+      - name: Filter SAM history
+        working-directory: source
+        run: |
+          git filter-repo \
+            --refs phase3-source \
+            --path 'SAM - Adversarial Self-Attention Misdirection/' \
+            --path-rename 'SAM - Adversarial Self-Attention Misdirection/':' ' \
+            --force
+          git checkout phase3-source
+          python - <<'PY'
+          from pathlib import Path
+          for p in Path('.').iterdir():
+              if p.name.startswith(' '):
+                  target = Path(p.name.lstrip())
+                  p.rename(target)
+          PY
+
+      - name: Attach filtered history to target baseline
+        working-directory: source
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          target_url="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git remote add target "${target_url}"
+          git fetch target main
+          filtered_head=$(git rev-parse HEAD)
+          target_main=$(git rev-parse target/main)
+          filtered_tree=$(git rev-parse "${filtered_head}^{tree}")
+          import_commit=$(printf '%s\n' \
+            'chore: attach filtered historical implementation' \
+            '' \
+            "Source repository: ${SOURCE_REPOSITORY}" \
+            "Source commit: ${SOURCE_COMMIT}" \
+            'Filtered path: SAM - Adversarial Self-Attention Misdirection/' \
+            | git commit-tree "${filtered_tree}" -p "${target_main}" -p "${filtered_head}")
+          git checkout -B "${IMPORT_BRANCH}" "${import_commit}"
+          git tag -f -a "${ARCHIVE_TAG}" "${import_commit}" -m "Historical SAM research snapshot from ${SOURCE_COMMIT}"
+
+      - name: Add import provenance
+        working-directory: source
+        run: |
+          cat > HISTORICAL_IMPORT.md <<'EOF'
+          # Historical import provenance
+
+          This branch preserves the historical `SAM - Adversarial Self-Attention Misdirection/` implementation from:
+
+          - source repository: `mormille/self-attention-regularization`
+          - frozen source commit: `9f294c2a19fb855dd6230d6fcb38607e36fcac7e`
+          - imported source path: `SAM - Adversarial Self-Attention Misdirection/`
+          - archive tag: `v0.1.0-research-archive`
+
+          The archive tag points to the exact filtered snapshot before this provenance file was added.
+
+          ## Status
+
+          This is experimental historical research code. It has not been modernized, reconciled with the final paper formulation, or verified in a recovered runtime environment. Historical Git LFS objects were not migrated by this workflow.
+
+          Original commit authorship and dates are retained in the filtered history. The additional attachment and provenance commits were created solely to connect the imported history to this target repository.
+          EOF
+          git add HISTORICAL_IMPORT.md
+          git commit -m "docs: record historical import provenance"
+
+      - name: Push migration branch and archive tag
+        working-directory: source
+        run: |
+          git push --force target "HEAD:refs/heads/${IMPORT_BRANCH}"
+          git push --force target "refs/tags/${ARCHIVE_TAG}"
