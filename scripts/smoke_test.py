@@ -21,7 +21,9 @@ def main() -> None:
     torch.set_num_threads(2)
     batch_size = 2
 
-    generator = UNet(n_channels=3, n_classes=3, bilinear=True)
+    # Match the historical launch-SAM.py configuration. The truncated decoder
+    # is configured for transposed convolutions rather than bilinear upsampling.
+    generator = UNet(n_channels=3, n_classes=3, bilinear=False)
     critic = ARViT(
         num_encoder_layers=1,
         nhead=4,
