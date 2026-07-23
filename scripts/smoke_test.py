@@ -2,12 +2,18 @@
 """Minimal alternating-step smoke test for the archived SAM prototype."""
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
 import torch
 from torch import nn
 
-from losses.sam_loss import CriticLoss, GeneratorLoss, Misdirection_loss
-from models.ARViT import ARViT
-from models.unet import UNet
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from losses.sam_loss import CriticLoss, GeneratorLoss, Misdirection_loss  # noqa: E402
+from models.ARViT import ARViT  # noqa: E402
+from models.unet import UNet  # noqa: E402
 
 
 def main() -> None:
