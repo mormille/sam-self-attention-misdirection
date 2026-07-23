@@ -1,0 +1,42 @@
+name: Phase 4 legacy smoke
+
+on:
+  pull_request:
+    branches:
+      - migration/phase-3-historical-import
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+jobs:
+  legacy-smoke:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.8"
+      - name: Install reconstructed legacy environment
+        run: |
+          python -m pip install -q pip==23.3.2 setuptools==68.2.2 wheel==0.41.3
+          python -m pip install -q -r environment/legacy-requirements.txt
+      - name: Report environment
+        run: |
+          python - <<'PY'
+          import fastai, numpy, scipy, torch, torchvision
+          print({
+              "python": __import__("sys").version,
+              "torch": torch.__version__,
+              "torchvision": torchvision.__version__,
+              "fastai": fastai.__version__,
+              "numpy": numpy.__version__,
+              "scipy": scipy.__version__,
+          })
+          PY
+      - name: Run alternating SAM smoke
+        run: python scripts/smoke_test.py
